@@ -12,3 +12,6 @@ Revision history for Perl extension WWW::Bugzilla.
 	- removed cc and bug_number from %update_field_map, these should 
 		never have to be updated and were causing warnings from WWW::Mechanize.
 	- available() now uses proper field mappings, thanks to Scott Lanning for catching this error
+
+0.4  Mon Mar 22 11:48:16 2004
+	- catfile no longer used, as it was causing errors on Win32 boxes.  File::Spec no longer required.

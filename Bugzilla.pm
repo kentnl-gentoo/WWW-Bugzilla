@@ -1,10 +1,9 @@
 package WWW::Bugzilla;
 
-$WWW::Bugzilla::VERSION = '0.3';
+$WWW::Bugzilla::VERSION = '0.4';
 
 use strict;
 use warnings;
-use File::Spec::Functions qw(catdir);
 use WWW::Mechanize;
 use Carp qw(croak);
 
@@ -226,7 +225,7 @@ sub _get_new_page {
                                                                   
     my $mech = $self->{mech};
                                                                   
-    my $new_page = $self->{protocol}.'://'.catdir($self->{server},'enter_bug.cgi?product='.$self->{product});
+    my $new_page = $self->{protocol}.'://'.$self->{server}.'/enter_bug.cgi?product='.$self->{product};
     $mech->get($new_page);
 
     # bail unless OK or Redirect happens
@@ -239,7 +238,7 @@ sub _get_update_page {
 
     my $mech = $self->{mech};
 
-    my $update_page = $self->{protocol}.'://'.catdir($self->{server},'show_bug.cgi?id='.$self->{bug_number});
+    my $update_page = $self->{protocol}.'://'.$self->{server}.'/show_bug.cgi?id='.$self->{bug_number};
     $mech->get($update_page);
 
     # bail unless OK or Redirect happens
@@ -259,7 +258,7 @@ sub _login {
 
     my $mech = $self->{mech};
 
-    my $login_page = $self->{protocol}.'://'.catdir($server,'query.cgi?GoAheadAndLogIn=1');
+    my $login_page = $self->{protocol}.'://'.$server.'/query.cgi?GoAheadAndLogIn=1';
     
     $mech->get( $login_page ); 
 
@@ -443,7 +442,7 @@ sub add_attachment {
 
     croak("You must include a filepath and description.") unless ($args{filepath} and $args{description});
  
-    my $attach_page = $self->{protocol}.'://'.catdir($self->{server},'attachment.cgi?bugid='.$self->{bug_number}.'&action=enter');
+    my $attach_page = $self->{protocol}.'://'.$self->{server}.'/attachment.cgi?bugid='.$self->{bug_number}.'&action=enter';
     
     $mech->get( $attach_page );
     $mech->field( 'data', $args{'filepath'} );
