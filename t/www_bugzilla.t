@@ -1,8 +1,6 @@
 use strict;
 use warnings;
 use Test::More qw(no_plan);
-use Krang::Script;
-use Krang::Conf qw (KrangRoot);
 use File::Spec::Functions qw(catfile);
 
 BEGIN {use_ok('WWW::Bugzilla');}
@@ -45,7 +43,7 @@ $ubz->additional_comments( "comments here");
 
 $ubz->commit;
 
-my $filepath = catfile(KrangRoot,'t','media','krang.jpg');
+my $filepath = './Bugzilla.pm';
 $ubz->add_attachment(   filepath => $filepath,
                         description => 'this is attach desc' );
 

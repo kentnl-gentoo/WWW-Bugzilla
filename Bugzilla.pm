@@ -1,6 +1,6 @@
 package WWW::Bugzilla;
 
-$WWW::Bugzilla::VERSION = '0.1';
+$WWW::Bugzilla::VERSION = '0.2';
 
 use strict;
 use warnings;
@@ -153,7 +153,9 @@ new() supports the following name-value parameters.
 
 =item server (required)
 
-URL of the bugzilla server you wish to interface with.
+URL of the bugzilla server you wish to interface with. Do not 
+place http:// or https:// in front of the url (see 'use_ssl' option
+below)
 
 =item email (required)
 
@@ -163,6 +165,10 @@ bugzilla login.
 =item password (required)
 
 Bugzilla password.
+
+=item use_ssl (optional)
+
+If set, will use https:// protocol, defaults to http://
 
 =item product
 
@@ -201,6 +207,8 @@ sub init {
 
     $self->{mech} =  WWW::Mechanize->new();
 
+    $self->{protocol} = $args{use_ssl} ? 'https' : 'http';
+
     $self->{server} = $args{server};                                                                              
     $self->_login( delete $args{server}, delete $args{email}, delete $args{password});
     
@@ -217,7 +225,7 @@ sub _get_new_page {
                                                                   
     my $mech = $self->{mech};
                                                                   
-    my $new_page = 'http://'.catdir($self->{server},'enter_bug.cgi?product='.$self->{product});
+    my $new_page = $self->{protocol}.'://'.catdir($self->{server},'enter_bug.cgi?product='.$self->{product});
     $mech->get($new_page);
 
     # bail unless OK or Redirect happens
@@ -230,7 +238,7 @@ sub _get_update_page {
 
     my $mech = $self->{mech};
 
-    my $update_page = 'http://'.catdir($self->{server},'show_bug.cgi?id='.$self->{bug_number});
+    my $update_page = $self->{protocol}.'://'.catdir($self->{server},'show_bug.cgi?id='.$self->{bug_number});
     $mech->get($update_page);
 
     # bail unless OK or Redirect happens
@@ -250,7 +258,7 @@ sub _login {
 
     my $mech = $self->{mech};
 
-    my $login_page = 'http://'.catdir($server,'query.cgi?GoAheadAndLogIn=1');
+    my $login_page = $self->{protocol}.'://'.catdir($server,'query.cgi?GoAheadAndLogIn=1');
     
     $mech->get( $login_page ); 
 
@@ -430,7 +438,7 @@ sub add_attachment {
 
     croak("You must include a filepath and description.") unless ($args{filepath} and $args{description});
  
-    my $attach_page = 'http://'.catdir($self->{server},'attachment.cgi?bugid='.$self->{bug_number}.'&action=enter');
+    my $attach_page = $self->{protocol}.'://'.catdir($self->{server},'attachment.cgi?bugid='.$self->{bug_number}.'&action=enter');
     
     $mech->get( $attach_page );
     $mech->field( 'data', $args{'filepath'} );

@@ -3,4 +3,4 @@ Changes
 Makefile.PL
 MANIFEST
 README
-t/1.t
+t/www_bugzilla.t
