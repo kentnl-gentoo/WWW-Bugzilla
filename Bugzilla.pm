@@ -1,6 +1,6 @@
 package WWW::Bugzilla;
 
-$WWW::Bugzilla::VERSION = '0.2';
+$WWW::Bugzilla::VERSION = '0.3';
 
 use strict;
 use warnings;
@@ -24,14 +24,14 @@ my %new_field_map = (   product => 'product',
                         url => 'bug_file_loc' );
 
 my %update_field_map = (product => 'product',
-                        bug_number => 'id',
+#                        bug_number => 'id', 	# this cannot be updated
                         platform => 'rep_platform',
                         product => 'product',
                         os => 'op_sys',
                         add_cc => 'newcc',
                         component => 'component',
                         version => 'version',
-                        cc => 'cc',
+#                        cc => 'cc', 	# this field should not be updated, use add_cc
                         status => 'knob',
                         priority => 'priority',
                         severity => 'bug_severity',
@@ -78,6 +78,7 @@ WWW::Bugzilla - Handles submission/update of bugzilla bugs via WWW::Mechanize.
     $bz->component( $components[0] );
 
     # optionally do the same for platform, os, priority, severity.
+
     $bz->assigned_to( 'joeschmoe@whatever.com' );
     $bz->summary( $some_text );
     $bz->description( $some_more_text );
@@ -299,7 +300,11 @@ sub available {
     my $field_choice = shift;
     my $mech = $self->{mech};
 
-    if (my $item = $mech->current_form->find_input( $field_choice )) {
+    # note that we are using %new_field map regardless if this is a new bug
+    # or not.  this should work, as these fields should be the same for
+    # both new and old, but look here if problems occur!
+    
+    if (my $item = $mech->current_form->find_input( $new_field_map{$field_choice} )) {
         return $item->possible_values();
     } else {
         return undef;

@@ -7,3 +7,8 @@ Revision history for Perl extension WWW::Bugzilla.
 0.2  Thu Nov 20 22:46:13 2003
         - added 'use_ssl' option which then uses 'https://' protocol
         - fixed www_bugzilla test script and placed it t/
+
+0.3  Thu Mar 11 18:33:39 2004
+	- removed cc and bug_number from %update_field_map, these should 
+		never have to be updated and were causing warnings from WWW::Mechanize.
+	- available() now uses proper field mappings, thanks to Scott Lanning for catching this error
