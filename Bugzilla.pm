@@ -1,13 +1,13 @@
 package WWW::Bugzilla;
 
-$WWW::Bugzilla::VERSION = '0.4';
+$WWW::Bugzilla::VERSION = '0.5';
 
 use strict;
 use warnings;
 use WWW::Mechanize;
 use Carp qw(croak);
 
-use constant FIELDS => qw( product version component status assigned_to resolution dup_id assigned_to summary bug_number description os platform severity priority cc url add_cc target_milestone status_whiteboard keywords depends_on blocks additional_comments );
+use constant FIELDS => qw( product version component status resolution dup_id assigned_to summary bug_number description os platform severity priority cc url add_cc target_milestone status_whiteboard keywords depends_on blocks additional_comments );
  
 my %new_field_map = (   product => 'product',
                         version => 'version',

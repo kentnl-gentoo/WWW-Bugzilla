@@ -15,3 +15,7 @@ Revision history for Perl extension WWW::Bugzilla.
 
 0.4  Mon Mar 22 11:48:16 2004
 	- catfile no longer used, as it was causing errors on Win32 boxes.  File::Spec no longer required.
+
+0.5  Tue Jun 14 12:08:16 2004
+        - removed duplicate assigned_to from FIELDS, was causing problems for some users (and was a mistake anyhow)
+
