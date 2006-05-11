@@ -1,13 +1,13 @@
 package WWW::Bugzilla;
 
-$WWW::Bugzilla::VERSION = '0.5';
+$WWW::Bugzilla::VERSION = '0.6';
 
 use strict;
 use warnings;
 use WWW::Mechanize;
-use Carp qw(croak);
+use Carp qw(croak carp);
 
-use constant FIELDS => qw( product version component status resolution dup_id assigned_to summary bug_number description os platform severity priority cc url add_cc target_milestone status_whiteboard keywords depends_on blocks additional_comments );
+use constant FIELDS => qw( version component status resolution dup_id assigned_to summary bug_number description os platform severity priority cc url add_cc target_milestone status_whiteboard keywords depends_on blocks additional_comments );
  
 my %new_field_map = (   product => 'product',
                         version => 'version',
@@ -25,7 +25,6 @@ my %new_field_map = (   product => 'product',
 my %update_field_map = (product => 'product',
 #                        bug_number => 'id', 	# this cannot be updated
                         platform => 'rep_platform',
-                        product => 'product',
                         os => 'op_sys',
                         add_cc => 'newcc',
                         component => 'component',
@@ -203,7 +202,8 @@ sub init {
                         
     croak("'server', 'email', and 'password' are all required arguments.") if ( (not $args{server}) or (not $args{email}) or (not $args{password}) ); 
 
-    croak("'product' required for new bug.") if ( (not $args{product}) and (not $args{bug_number}) );
+#    croak("'product' required for new bug.") if ( (not $args{product}) and (not $args{bug_number}) );
+    $self->{'product'} = $args{'product'} if (defined($args{'product'}));
 
     $self->{mech} =  WWW::Mechanize->new();
 
@@ -215,7 +215,11 @@ sub init {
     # finish the object
     $self->hash_init(%args);
 
-    $self->{bug_number} ? $self->_get_update_page : $self->_get_new_page;
+    if ($self->{bug_number}) {
+        $self->_get_update_page();
+    } elsif ($self->{'product'}) {
+        $self->_get_new_page();
+    }
 
     return $self;
 }
@@ -227,6 +231,7 @@ sub _get_new_page {
                                                                   
     my $new_page = $self->{protocol}.'://'.$self->{server}.'/enter_bug.cgi?product='.$self->{product};
     $mech->get($new_page);
+    $self->check_error();
 
     # bail unless OK or Redirect happens
     croak("Cannot open page $new_page") unless ( ($mech->status == '200') or ($mech->status == '404') );
@@ -248,8 +253,8 @@ sub _get_update_page {
     foreach my $field ( keys %update_field_map ) {
         if ($mech->current_form->find_input($update_field_map{$field})) {    
             $self->{$field} = $mech->current_form->value( $update_field_map{$field} );
-        } 
-    } 
+        }
+    }
 }
 
 sub _login {
@@ -299,6 +304,15 @@ sub available {
     my $field_choice = shift;
     my $mech = $self->{mech};
 
+    # we handle product seperately because bugzilla requires it to be handled 
+    # seperately on bug creation
+    if ('product' eq lc($field_choice)) {
+        return $self->get_products();
+    }
+
+    # make sure that we've set a product before we do any of the other stuff
+    croak("available() needs a valid product to be specified") if not $self->{'product'};
+ 
     # note that we are using %new_field map regardless if this is a new bug
     # or not.  this should work, as these fields should be the same for
     # both new and old, but look here if problems occur!
@@ -309,6 +323,27 @@ sub available {
         return undef;
     }
 }
+
+=item product()
+
+Set the Product for the bug
+
+=cut
+
+sub product {
+    my ($self, $product) = @_;
+
+    if ($product) {
+        $self->{'product'} = $product;
+        if ($self->{bug_number}) {
+            $self->_get_update_page();
+        } elsif ($self->{'product'}) {
+            $self->_get_new_page();
+        }
+    }
+    return ($self->{'product'});
+}
+
 
 =item reassign() 
 
@@ -439,6 +474,8 @@ sub add_attachment {
     my $self = shift;
     my %args = @_;
     my $mech = $self->{mech};
+    
+    croak("add_attachment() may not be called until the bug is committed for the first time") if not $self->{bug_number};
 
     croak("You must include a filepath and description.") unless ($args{filepath} and $args{description});
  
@@ -446,10 +483,17 @@ sub add_attachment {
     
     $mech->get( $attach_page );
     $mech->field( 'data', $args{'filepath'} );
-    $mech->field( 'description', $args{description} ) if $args{description};
+    $mech->field( 'description', $args{description} );
     $mech->field( 'comment', $args{comment} ) if $args{comment};
     $mech->field( 'ispatch', 1 ) if $args{'is_patch'};
-    
+
+    if ($args{'bigfile'}) {
+        if ($mech->current_form->find_input('bigfile', 'checkbox', 0)) {
+            $mech->tick('bigfile', 'bigfile');
+        } else {
+            croak('Bigfile support is not available');
+        }
+    }
     if ( $args{content_type} ) {
         $mech->field( 'contenttypemethod', 'manual' );
         $mech->field( 'contenttypeentry', $args{content_type} );
@@ -458,9 +502,85 @@ sub add_attachment {
     }
 
     $mech->submit_form(); 
+    $self->check_error();
+    my $id;
+    if ($mech->content =~ /Created/) {
+        my $link = $mech->find_link(text_regex => qr/^Attachment #\d+$/);
+        if ($link->attrs()->{'title'} ne "'" . $args{'description'} . "'" ) {
+            croak('attachment not created');
+        }
+        if ($link->text =~ /^Attachment #(\d+)$/) {
+            $id = $1;
+        } else {
+            croak('attachment not created');
+        }
+    }
 
-    $self->_get_update_page() unless ($args{finished});  
+    $self->_get_update_page() unless ($args{finished});
+    return $id;
 }
+
+=item list_attachments()
+
+Lists attachments that are attached to an existing bug - will not work for new bugs.
+
+=cut
+
+sub list_attachments {
+    my $self = shift;
+    my $mech = $self->{mech};
+    
+    croak("list_attachments() may not be called until the bug is committed for the first time") if not $self->{bug_number};
+    
+    my $bug_page = $self->{protocol}.'://'.$self->{server}.'/show_bug.cgi?id='.$self->{bug_number};
+    $mech->get($bug_page);
+    $self->check_error();
+    
+    my (@attachments);
+    foreach my $link ($mech->find_all_links(url_regex => qr/attachment\.cgi\?id=\d+$/)) {
+        if ($link->url() =~ /attachment.cgi\?id=(\d+)$/) {
+            push (@attachments, { id => $1, name => $link->text() });
+        } else {
+            croak("WWW::Mechanize find_all_links gave us a bogus URL");
+        }
+    }
+    return (@attachments);
+}
+
+=item get_attachment()
+
+Get the specified attachment from an existing bug - will not work for new bugs.
+
+=cut
+
+sub get_attachment {
+    my $self = shift;
+    my %args = @_;
+    my $mech = $self->{mech};
+    
+    croak("get_attachment() may not be called until the bug is committed for the first time") if not $self->{bug_number};
+    
+    croak("You must provide either the 'id' or 'name' of the attachment you wish to retreive") unless ($args{id} || $args{name});
+    
+    my $bug_page = $self->{protocol}.'://'.$self->{server}.'/show_bug.cgi?id='.$self->{bug_number};
+    $mech->get($bug_page);
+    $self->check_error();
+ 
+    my @links;
+    if ($args{'id'}) {
+        @links = $mech->find_all_links( url => 'attachment.cgi?id=' . $args{'id'} );
+    } elsif ($args{'name'}) {
+        @links = $mech->find_all_links( text => $args{'name'} );
+        if (scalar(@links) > 1) {
+            carp('multiple attachments have the same name, returning the first one');
+        }
+    }
+
+    croak('No such attachment') if (!@links);
+    $mech->get($links[0]);
+    return $mech->content();
+}
+
 
 =item commit()
 
@@ -474,7 +594,7 @@ sub commit {
     my $self = shift;
     my %args = @_;
     my $mech = $self->{mech};
-    
+
     if ($self->{bug_number}) {
         foreach my $field ( keys %update_field_map ) {
             $mech->field( $update_field_map{$field}, $self->{$field} ) if defined($self->{$field});
@@ -504,11 +624,74 @@ sub commit {
     }
 
     $mech->submit_form();
+    $self->check_error();
     $self->{bug_number} = $mech->current_form->value( 'id' ) if not ($self->{bug_number});
 
     $self->_get_update_page() unless ($args{finished});
 
     return $self->{bug_number};
+}
+
+=item check_error ()
+
+Checks if an error was given, croaking if it did.
+
+=cut 
+
+sub check_error {
+    my ($self) = @_;
+    my $mech = $self->{mech};
+    
+    if ($mech->content() =~ /<td bgcolor="#ff0000">[\s\r\n]*<font size="\+2">[\s\r\n]*(.*?)[\s\r\n]*<\/font>[\s\r\n]*<\/td>/smi) {
+        croak("error : $1");
+    }
+}
+
+=item get_products ()
+
+Gets a list of products
+
+=cut 
+
+sub get_products {
+    my ($self) = @_;
+    my $mech = $self->{mech};
+    
+    my $url = $self->{protocol}.'://'.$self->{server}.'/enter_bug.cgi';
+    $mech->get($url);
+    $self->check_error();
+
+    my @products;
+    foreach my $product ($mech->find_all_links( url_regex => qr/enter_bug.cgi\?product=/)) {
+        push (@products, $product->text());
+    }
+
+    return (@products);
+}
+
+=item get_comments()
+
+Lists comments made on an existing bug - will not work for new bugs.
+
+=cut
+
+sub get_comments {
+    my ($self) = @_;
+    croak("get_comments() may not be called until the bug is committed for the first time") if not $self->{bug_number};
+    
+    my $mech = $self->{mech};
+    my $bug_page = $self->{protocol}.'://'.$self->{server}.'/show_bug.cgi?id='.$self->{bug_number};
+    $mech->get($bug_page);
+    $self->check_error(); 
+
+    my @comments;
+    my $content = $mech->content();
+    while ($content =~ m/<pre id="comment_text_\d+">(.*?)<\/pre>/smg) {
+        my $comment = $1;
+        chomp($comment);
+        push (@comments, $comment);
+    }
+    return (@comments);
 }
 
 =back
@@ -522,15 +705,20 @@ just send me an email at the address listed below.
  
 =head1 AUTHOR
 
+Maintained by:
+    Brian Caswell, bmc@shmoo.com
+
+Originally written by:
 Matthew C. Vella, the_mcv@yahoo.com
 
 =head1 LICENSE
                                                                       
   WWW::Bugzilla - Module providing API to create or update Bugzilla bugs.
   Copyright (C) 2003 Matthew C. Vella (the_mcv@yahoo.com)
+
+  Portions Copyright (C) 2006 Brian Caswell (bmc@shmoo.com)
                                                                       
-  This module is free software; you can redistribute it and/or modify
-it
+  This module is free software; you can redistribute it and/or modify it
   under the terms of either:
                                                                       
   a) the GNU General Public License as published by the Free Software

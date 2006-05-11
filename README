@@ -33,13 +33,14 @@ WWW::Mechanize
 Class::MethodMaker
 
 CONTACT INFO
-This module was written by Matthew C. Vella (the_mcv@yahoo.com).
+Brian Caswell (bmc@shmoo.com).
 
 COPYRIGHT AND LICENCE
 
 WWW::Bugzilla - a perl API for creation and updating of Bugzilla bugs.
 Copyright (C) 2003 Matthew C. Vella (the_mcv@yahoo.com)
-                                                                                  
+Portions Copyright (C) 2006 Brian Caswell (bmc@shmoo.com)
+
 This module is free software; you can redistribute it and/or modify it
 under the terms of either:
                                                                                   
