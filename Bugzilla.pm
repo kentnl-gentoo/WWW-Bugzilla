@@ -1,6 +1,6 @@
 package WWW::Bugzilla;
 
-$WWW::Bugzilla::VERSION = '0.6';
+$WWW::Bugzilla::VERSION = '0.7';
 
 use strict;
 use warnings;
@@ -167,7 +167,9 @@ Bugzilla password.
 
 =item use_ssl (optional)
 
-If set, will use https:// protocol, defaults to http://
+If set, will use https:// protocol, defaults to http://.  
+
+NOTE: This option requires Crypt::SSLeay.
 
 =item product
 
@@ -207,7 +209,7 @@ sub init {
 
     $self->{mech} =  WWW::Mechanize->new();
 
-    $self->{protocol} = $args{use_ssl} ? 'https' : 'http';
+    $self->{protocol} = delete($args{use_ssl}) ? 'https' : 'http';
 
     $self->{server} = $args{server};                                                                              
     $self->_login( delete $args{server}, delete $args{email}, delete $args{password});
