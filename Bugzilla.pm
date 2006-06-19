@@ -1,6 +1,6 @@
 package WWW::Bugzilla;
 
-$WWW::Bugzilla::VERSION = '0.7';
+$WWW::Bugzilla::VERSION = '0.8';
 
 use strict;
 use warnings;
@@ -259,6 +259,23 @@ sub _get_update_page {
     }
 }
 
+# based on the current page, set the current form to the first form with a specified field
+sub _get_form_by_field {
+    my ($self, $field) = @_;
+    croak("invalid field") if !$field;
+
+    my $mech = $self->{mech};
+    my $i = 1;
+    foreach my $form ($mech->forms()) {
+        if ($form->find_input($field)) {
+            $mech->form($i);
+            return;
+        }
+        $i++;
+    }
+    croak("No form with the field $field available");
+}
+
 sub _login {
     my $self = shift;
     my ($server, $email, $password) = @_;
@@ -272,11 +289,10 @@ sub _login {
     # bail unless OK or Redirect happens
     croak("Cannot open page $login_page") unless ( ($mech->status == '200') or ($mech->status == '404') );
 
-    $mech->form_number(1);
+    $self->_get_form_by_field('Bugzilla_login');
     $mech->field('Bugzilla_login', $email);
     $mech->field('Bugzilla_password', $password);
     $mech->submit_form();
- 
 }
 
 =item product() version() component() status() assigned_to() resolution() dup_id() assigned_to() summary() bug_number() description() os() platform() severity() priority() cc() url() add_cc() target_milestone() status_whiteboard() keywords() depends_on() blocks() additional_comments()
