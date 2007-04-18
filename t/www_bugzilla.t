@@ -18,7 +18,7 @@ my $product  = 'FoodReplicator';
 my $summary     = 'this is my summary';
 my $description = "this is my description.\nthere are many like it, but this one is mine.";
         
-my @products = ( '_test product', 'FoodReplicator', 'MyOwnBadSelf', 'Product with no description', 'Spider Séçretíøns', 'WorldControl' );
+my @products = ( '_test product', 'FoodReplicator', 'MyOwnBadSelf', 'Pony', 'Product with no description', 'Spider Séçretíøns', 'WorldControl' );
 
 my @added_comments;
 

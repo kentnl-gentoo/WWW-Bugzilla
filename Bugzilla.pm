@@ -1,6 +1,6 @@
 package WWW::Bugzilla;
 
-$WWW::Bugzilla::VERSION = '0.8';
+$WWW::Bugzilla::VERSION = '0.9';
 
 use strict;
 use warnings;
@@ -268,7 +268,7 @@ sub _get_form_by_field {
     my $i = 1;
     foreach my $form ($mech->forms()) {
         if ($form->find_input($field)) {
-            $mech->form($i);
+            $mech->form_number($i);
             return;
         }
         $i++;
