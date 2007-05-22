@@ -1,8 +1,8 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         WWW-Bugzilla
-version:      0.9
-version_from: Bugzilla.pm
+version:      0.10
+version_from: WWW/Bugzilla.pm
 installdirs:  site
 requires:
     Carp:                          0

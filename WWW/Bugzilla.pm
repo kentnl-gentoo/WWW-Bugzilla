@@ -1,6 +1,6 @@
 package WWW::Bugzilla;
 
-$WWW::Bugzilla::VERSION = '0.9';
+$WWW::Bugzilla::VERSION = '0.10';
 
 use strict;
 use warnings;
@@ -201,7 +201,7 @@ use Class::MethodMaker
 sub init {
     my $self = shift;
     my %args = @_;
-                        
+   
     croak("'server', 'email', and 'password' are all required arguments.") if ( (not $args{server}) or (not $args{email}) or (not $args{password}) ); 
 
 #    croak("'product' required for new bug.") if ( (not $args{product}) and (not $args{bug_number}) );
@@ -716,10 +716,10 @@ sub get_comments {
 
 =head1 BUGS, IMPROVEMENTS
 
-There may well be bugs in this module.  Using it as I have, I just
-have not run into any.  In addition, this module does not support 
-ALL of Bugzilla's features.  I will consider any patches or improvements,
-just send me an email at the address listed below.
+There may well be bugs in this module.  Using it as I have, I just have not run
+into any.  In addition, this module does not support ALL of Bugzilla's
+features.  I will consider any patches or improvements, just send me an email
+at the address listed below.
  
 =head1 AUTHOR
 
@@ -727,7 +727,7 @@ Maintained by:
     Brian Caswell, bmc@shmoo.com
 
 Originally written by:
-Matthew C. Vella, the_mcv@yahoo.com
+    Matthew C. Vella, the_mcv@yahoo.com
 
 =head1 LICENSE
                                                                       

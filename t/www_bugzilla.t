@@ -18,7 +18,7 @@ my $product  = 'FoodReplicator';
 my $summary     = 'this is my summary';
 my $description = "this is my description.\nthere are many like it, but this one is mine.";
         
-my @products = ( '_test product', 'FoodReplicator', 'MyOwnBadSelf', 'Pony', 'Product with no description', 'Spider Séçretíøns', 'WorldControl' );
+my @products = ( '_test product', 'FoodReplicator', 'MyOwnBadSelf', 'Pony', 'Product with no description', "Spider S\x{e9}\x{e7}ret\x{ed}\x{f8}ns", 'WorldControl' );
 
 my @added_comments;
 
@@ -34,7 +34,7 @@ if (1) {
     like($@, qr/available\(\) needs a valid product to be specified/, 'product first');
 
     my @available = $bz->available('product');
-    is_deeply(\@products, \@available, 'expected: product');
+    is_deeply(\@available, \@products, 'expected: product');
     
     eval { $bz->product('this is not a real product'); };
     like ($@, qr/error \: Sorry\, either the product/, 'invalid product');
@@ -126,13 +126,13 @@ if (1) {
             'Neutrino',            'OpenVMS',
             'OS/2',                'OSF/1',
             'Solaris',             'SunOS',
-            'MáçØß',           'Other'
+            "M\x{e1}\x{e7}\x{d8}\x{df}", 'Other'
         ]
     );
 
     foreach my $field (keys %expected) {
         my @available = $bz->available($field);
-        is_deeply($expected{$field}, \@available, "expected: $field");
+        is_deeply(\@available, $expected{$field}, "expected: $field");
         eval { $bz->$field($available[1]); };
         ok(!$@, "set: $field");
     }

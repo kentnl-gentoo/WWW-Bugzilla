@@ -5,7 +5,7 @@ use ExtUtils::MakeMaker;
 # the contents of the Makefile that is written.
 WriteMakefile(
     'NAME'         => 'WWW::Bugzilla',
-    'VERSION_FROM' => 'Bugzilla.pm',     # finds $VERSION
+    'VERSION_FROM' => 'WWW/Bugzilla.pm',     # finds $VERSION
     'PREREQ_PM'    => {
         Carp               => 0,
         WWW::Mechanize     => 1.22,
