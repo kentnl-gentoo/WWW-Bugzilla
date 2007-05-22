@@ -1,6 +1,6 @@
 package WWW::Bugzilla;
 
-$WWW::Bugzilla::VERSION = '0.9.1';
+$WWW::Bugzilla::VERSION = '1.0';
 
 use strict;
 use warnings;
