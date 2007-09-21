@@ -1,6 +1,6 @@
 package WWW::Bugzilla;
 
-$WWW::Bugzilla::VERSION = '1.0';
+$WWW::Bugzilla::VERSION = '1.1';
 
 use strict;
 use warnings;
@@ -557,7 +557,11 @@ sub list_attachments {
     my (@attachments);
     foreach my $link ($mech->find_all_links(url_regex => qr/attachment\.cgi\?id=\d+$/)) {
         if ($link->url() =~ /attachment.cgi\?id=(\d+)$/) {
-            push (@attachments, { id => $1, name => $link->text() });
+            my $id = $1;
+            my $re = '<a href="' . $link->url() . '"><span class="(bz_obsolete)">';
+            $re =~ s/\?/\\?/g;
+            my $obsolete = ($mech->content() =~ /$re/) ? 1 : 0;
+            push (@attachments, { id => $id, name => $link->text(), obsolete => $obsolete });
         } else {
             croak("WWW::Mechanize find_all_links gave us a bogus URL");
         }
@@ -596,6 +600,43 @@ sub get_attachment {
 
     croak('No such attachment') if (!@links);
     $mech->get($links[0]);
+    return $mech->content();
+}
+
+=item obsolete_attachment()
+
+Mark the specified attachment obsolete.  - will not work for new bugs.
+
+=cut
+
+sub obsolete_attachment {
+    my $self = shift;
+    my %args = @_;
+    my $mech = $self->{mech};
+    
+    croak("obsolete_attachment() may not be called until the bug is committed for the first time") if not $self->{bug_number};
+    
+    croak("You must provide either the 'id' or 'name' of the attachment you wish to obsolete") unless ($args{id} || $args{name});
+    
+    my $bug_page = $self->{protocol}.'://'.$self->{server}.'/show_bug.cgi?id='.$self->{bug_number};
+    $mech->get($bug_page);
+    $self->check_error();
+ 
+    my @links;
+    if ($args{'id'}) {
+        @links = $mech->find_all_links( url => 'attachment.cgi?id=' . $args{'id'} );
+    } elsif ($args{'name'}) {
+        @links = $mech->find_all_links( text => $args{'name'} );
+        if (scalar(@links) > 1) {
+            carp('multiple attachments have the same name, returning the first one');
+        }
+    }
+    croak('No such attachment') if (!@links);
+    $links[0]->[0] = $links[0]->[0] . '&action=edit';
+    $links[0]->[5]->{'href'} = $links[0]->[5]->{'href'} . '&action=edit';
+    $mech->get($links[0]);
+    $mech->tick("isobsolete", 1);
+    $mech->submit();
     return $mech->content();
 }
 

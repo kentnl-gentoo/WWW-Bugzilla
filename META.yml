@@ -1,12 +1,13 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         WWW-Bugzilla
-version:      1.0
+version:      1.1
 version_from: WWW/Bugzilla.pm
 installdirs:  site
 requires:
     Carp:                          0
     Class::MethodMaker:            1.08
+    Params::Validate:              0.88
     WWW::Mechanize:                1.22
 
 distribution_type: module

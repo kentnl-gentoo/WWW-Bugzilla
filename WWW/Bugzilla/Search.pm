@@ -97,6 +97,8 @@ Resets all search criteria.
 #    }
 #}
 
+my $_SETUP;
+
 sub new {
     my $that  = shift;
     my $class = ref($that) || $that;
@@ -107,7 +109,7 @@ sub new {
     };
     bless $self, $class;
 
-    {
+    if (!$_SETUP) {
         no strict 'refs';
         # accessors
         foreach my $field (qw(mech protocol server email password)) {
@@ -131,6 +133,7 @@ sub new {
         foreach my $field (qw(assigned_to reporter summary)) {
             *{ $class . '::' . $field } = sub { my ($self, $value) = @_; if (defined $value) { $self->{'search_keys'}{$field} = $value; } return $self->{'search_keys'}{$field} }
         }
+        $_SETUP++;
     }
 
     if (@_) {
@@ -220,7 +223,7 @@ sub search {
     my @bugs;
     foreach my $link ($mech->links()) {
         if ($link->url() =~ /^show_bug\.cgi\?id=(\d+)$/) {
-            push (@bugs, WWW::Bugzilla->new( 'server' => $self->{'server'}, 'email' => $self->{'email'}, 'password' => $self->{'password'}, 'bug_number' => $1 ));
+            push (@bugs, WWW::Bugzilla->new( 'server' => $self->{'server'}, 'email' => $self->{'email'}, 'password' => $self->{'password'}, 'bug_number' => $1, 'use_ssl' => ($self->protocol() eq 'https') ? 1 : 0));
         }
     }
     return @bugs;

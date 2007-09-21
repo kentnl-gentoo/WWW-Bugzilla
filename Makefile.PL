@@ -9,6 +9,7 @@ WriteMakefile(
     'PREREQ_PM'    => {
         Carp               => 0,
         WWW::Mechanize     => 1.22,
-        Class::MethodMaker => 1.08
+        Class::MethodMaker => 1.08,
+        Params::Validate   => 0.88,
     },
 );

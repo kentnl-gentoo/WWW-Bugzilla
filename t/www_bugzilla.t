@@ -2,12 +2,12 @@
 
 use strict;
 use warnings;
-use Test::More qw(no_plan);
+use Test::More tests => 36;
 use File::Spec::Functions qw(catfile);
 use Data::Dumper;
 
 BEGIN { use_ok('WWW::Bugzilla'); }
-my $bug_number = 3033;
+my $bug_number = 3482;
 
 #my $server   = 'landfill.bugzilla.org/bugzilla-tip';
 my $server   = 'landfill.bugzilla.org/bugzilla-stable';
@@ -18,7 +18,12 @@ my $product  = 'FoodReplicator';
 my $summary     = 'this is my summary';
 my $description = "this is my description.\nthere are many like it, but this one is mine.";
         
-my @products = ( '_test product', 'FoodReplicator', 'MyOwnBadSelf', 'Pony', 'Product with no description', "Spider S\x{e9}\x{e7}ret\x{ed}\x{f8}ns", 'WorldControl' );
+#my @products = ( '_test product', 'FoodReplicator', 'MyOwnBadSelf', 'Pony', 'Product with no description', "Spider S\x{e9}\x{e7}ret\x{ed}\x{f8}ns", 'WorldControl' );
+
+# grr. LWP doesn not deal well with UTF-8, as such we have to cheat.  Sorry. 
+my @products = qw(5f746573742070726f64756374 466f6f645265706c696361746f72 4d794f776e42616453656c66 506f6e79 50726f647563742077697468206e6f206465736372697074696f6e 5370696465722053c3a9c3a7726574c3adc3b86e73 576f726c64436f6e74726f6c);
+
+
 
 my @added_comments;
 
@@ -33,16 +38,16 @@ if (1) {
     eval { $bz->available('component'); };
     like($@, qr/available\(\) needs a valid product to be specified/, 'product first');
 
-    my @available = $bz->available('product');
+    my @available = map(unpack('H*', $_), $bz->available('product'));
     is_deeply(\@available, \@products, 'expected: product');
-    
+
     eval { $bz->product('this is not a real product'); };
     like ($@, qr/error \: Sorry\, either the product/, 'invalid product');
    
     $bz->summary($summary);
     $bz->description($description);
     push (@added_comments, $description);
-    ok($bz->product($available[1]), 'set: product');
+    ok($bz->product(pack('H*',$available[1])), 'set: product');
 
     my $bugid = $bz->commit();
     like ($bugid, qr/^\d+$/, "bugid : $bugid");
@@ -108,26 +113,26 @@ if (1) {
         'version'  => ['1.0'],
         'platform' =>
           ['All', 'DEC', 'HP', 'Macintosh', 'PC', 'SGI', 'Sun', 'Other'],
-        'os' => [
-            'All',                 'Windows 3.1',
-            'Windows 95',          'Windows 98',
-            'Windows ME',          'Windows 2000',
-            'Windows NT',          'Windows XP',
-            'Windows Server 2003', 'Mac System 7',
-            'Mac System 7.5',      'Mac System 7.6.1',
-            'Mac System 8.0',      'Mac System 8.5',
-            'Mac System 8.6',      'Mac System 9.x',
-            'Mac OS X 10.0',       'Mac OS X 10.1',
-            'Mac OS X 10.2',       'Linux',
-            'BSD/OS',              'FreeBSD',
-            'NetBSD',              'OpenBSD',
-            'AIX',                 'BeOS',
-            'HP-UX',               'IRIX',
-            'Neutrino',            'OpenVMS',
-            'OS/2',                'OSF/1',
-            'Solaris',             'SunOS',
-            "M\x{e1}\x{e7}\x{d8}\x{df}", 'Other'
-        ]
+#        'os' => [
+#            'All',                 'Windows 3.1',
+#            'Windows 95',          'Windows 98',
+#            'Windows ME',          'Windows 2000',
+#            'Windows NT',          'Windows XP',
+#            'Windows Server 2003', 'Mac System 7',
+#            'Mac System 7.5',      'Mac System 7.6.1',
+#            'Mac System 8.0',      'Mac System 8.5',
+#            'Mac System 8.6',      'Mac System 9.x',
+#            'Mac OS X 10.0',       'Mac OS X 10.1',
+#            'Mac OS X 10.2',       'Linux',
+#            'BSD/OS',              'FreeBSD',
+#            'NetBSD',              'OpenBSD',
+#            'AIX',                 'BeOS',
+#            'HP-UX',               'IRIX',
+#            'Neutrino',            'OpenVMS',
+#            'OS/2',                'OSF/1',
+#            'Solaris',             'SunOS',
+#            "M\x{e1}\x{e7}\x{d8}\x{df}", 'Other'
+#        ]
     );
 
     foreach my $field (keys %expected) {
@@ -136,6 +141,17 @@ if (1) {
         eval { $bz->$field($available[1]); };
         ok(!$@, "set: $field");
     }
+  
+    # grr.  LWP does not deal with UTF-8.  cheating here too
+    {
+        my @os = qw(416c6c 57696e646f777320332e31 57696e646f7773203935 57696e646f7773203938 57696e646f7773204d45 57696e646f77732032303030 57696e646f7773204e54 57696e646f7773205850 57696e646f7773205365727665722032303033 4d61632053797374656d2037 4d61632053797374656d20372e35 4d61632053797374656d20372e362e31 4d61632053797374656d20382e30 4d61632053797374656d20382e35 4d61632053797374656d20382e36 4d61632053797374656d20392e78 4d6163204f5320582031302e30 4d6163204f5320582031302e31 4d6163204f5320582031302e32 4c696e7578 4253442f4f53 46726565425344 4e6574425344 4f70656e425344 414958 42654f53 48502d5558 49524958 4e65757472696e6f 4f70656e564d53 4f532f32 4f53462f31 536f6c61726973 53756e4f53 4dc3a1c3a7c398c39f 4f74686572);
+        my @available = map(unpack('H*',$_),$bz->available('os'));
+        is_deeply(\@available, \@os, "expected: os");
+        eval { $bz->os(pack('H*', $available[0])); };
+        ok(!$@, "set: os");
+    }
+
+
 
     $bz->assigned_to($email);
     $bz->summary($summary);
@@ -160,7 +176,7 @@ if (1)
         my $name = 'Attaching the GPL, since everyone needs a copy of the GPL!';
         my $id = $bz->add_attachment( filepath => $filepath, description => $name);
         like($id, qr/^\d+$/, 'add attachment');
-        push (@added_files, { id => $id, name => $name });
+        push (@added_files, { id => $id, name => $name, obsolete => 0 });
     }
 
     SKIP: 
@@ -169,7 +185,7 @@ if (1)
             my $name = 'Attaching the GPL, but as a big file!';
             my $id = $bz->add_attachment( filepath => $filepath, description => $name);
             like($id, qr/^\d+$/, 'add big attachment');
-            push (@added_files, { id => $id, name => $name });
+            push (@added_files, { id => $id, name => $name, obsolete => 0 });
         };
         skip 'bigfile support missing in target bugzilla', 1 if ($@ && $@ =~ /Bigfile support is not available/);
         pass('attach big file');
@@ -185,9 +201,8 @@ if (1)
             bug_number => $bug_number
             );
     
-    use Data::Dumper;
     my @attachments = $bz->list_attachments();
- 
+
     is_deeply(\@added_files, \@attachments, 'attached files');
 
     my $file = slurp('./GPL');
@@ -195,6 +210,10 @@ if (1)
     is($file, $bz->get_attachment(name => $attachments[0]->{'name'}), 'get attachment by name');
     eval { $bz->get_attachment(); };
     like ($@, qr/You must provide either the 'id' or 'name' of the attachment you wish to retreive/, 'get attachment without arguments');
+
+    $bz->obsolete_attachment(id => $attachments[0]->{'id'});
+    @attachments = $bz->list_attachments();
+    is ($attachments[0]{'obsolete'}, 1, 'obsolete_attachment');
 }
 
 sub slurp {
