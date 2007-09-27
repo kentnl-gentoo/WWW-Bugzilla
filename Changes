@@ -40,3 +40,10 @@ Revision history for Perl extension WWW::Bugzilla.
 
 1.0 - 2007/05/21
     - add search capabilities via WWW::Bugzilla::Search
+
+1.1 - 2007/09/21
+    - add support to obsolete file attachments
+
+1.2 - 2007/09/27
+    - support both stable (2.x) and tip (3.x)
+    - make tests skip if it can't get out to the bugzilla host via WWW::Mechanize.  

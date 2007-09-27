@@ -8,3 +8,4 @@ These people have been helpful in pointing out bugs & requesting useful features
 - Sheldon Fuchs ( Pointing out outdated Mechanize calls )
 - Leon ??? ( Pointing out WWW::Bugzilla doesn't work against bugzilla tip )
 - JPO ??? ( Suggestions to fix handle multiple forms per page, eg Redhat's bugzilla installation )
+- Harald Puhl ( Patch to support Bugzilla 3.0.1 )

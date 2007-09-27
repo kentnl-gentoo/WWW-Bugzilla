@@ -2,11 +2,14 @@
 
 use strict;
 use warnings;
-use Test::More tests => 22;
+use Test::More;
 use File::Spec::Functions qw(catfile);
 use Data::Dumper;
 
 BEGIN { use_ok('WWW::Bugzilla::Search'); }
+
+verify_host();
+plan tests => 22;
 
 #my $server   = 'landfill.bugzilla.org/bugzilla-tip';
 my $server   = 'landfill.bugzilla.org/bugzilla-stable';
@@ -62,3 +65,12 @@ foreach my $text (sort keys %searches) {
 
 $bz->reset();
 is_deeply({}, $bz->{'search_keys'}, 'reset');
+
+
+sub verify_host {
+    use WWW::Mechanize;
+    my $mech = WWW::Mechanize->new( autocheck => 0);
+    $mech->get('http://landfill.bugzilla.org/bugzilla-stable');
+    return if ($mech->res()->is_success);
+    plan skip_all => 'Cannot access remote host.  not testing';
+}

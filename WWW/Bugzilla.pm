@@ -1,13 +1,13 @@
 package WWW::Bugzilla;
 
-$WWW::Bugzilla::VERSION = '1.1';
+$WWW::Bugzilla::VERSION = '1.2';
 
 use strict;
 use warnings;
 use WWW::Mechanize;
 use Carp qw(croak carp);
 
-use constant FIELDS => qw( version component status resolution dup_id assigned_to summary bug_number description os platform severity priority cc url add_cc target_milestone status_whiteboard keywords depends_on blocks additional_comments );
+use constant FIELDS => qw( bugzilla_version version component status resolution dup_id assigned_to summary bug_number description os platform severity priority cc url add_cc target_milestone status_whiteboard keywords depends_on blocks additional_comments );
  
 my %new_field_map = (   product => 'product',
                         version => 'version',
@@ -219,7 +219,7 @@ sub init {
 
     if ($self->{bug_number}) {
         $self->_get_update_page();
-    } elsif ($self->{'product'}) {
+    } elsif ($self->{product}) {
         $self->_get_new_page();
     }
 
@@ -230,14 +230,13 @@ sub _get_new_page {
     my $self = shift;
                                                                   
     my $mech = $self->{mech};
-                                                                  
     my $new_page = $self->{protocol}.'://'.$self->{server}.'/enter_bug.cgi?product='.$self->{product};
     $mech->get($new_page);
     $self->check_error();
+    $mech->form_name('Create') if ($self->bugzilla_version == 3);
 
     # bail unless OK or Redirect happens
     croak("Cannot open page $new_page") unless ( ($mech->status == '200') or ($mech->status == '404') );
-
 }
 
 sub _get_update_page {
@@ -247,6 +246,8 @@ sub _get_update_page {
 
     my $update_page = $self->{protocol}.'://'.$self->{server}.'/show_bug.cgi?id='.$self->{bug_number};
     $mech->get($update_page);
+    $self->check_error();
+    $mech->form_name('changeform');
 
     # bail unless OK or Redirect happens
     croak("Cannot open page $update_page") unless ( ($mech->status == '200') or ($mech->status == '404') );
@@ -293,6 +294,16 @@ sub _login {
     $mech->field('Bugzilla_login', $email);
     $mech->field('Bugzilla_password', $password);
     $mech->submit_form();
+    
+    $mech->get($self->{protocol}.'://'.$server.'/');
+
+    if ($mech->content() =~ /<span>Version (\d+)\.\d+(\.\d+)?\+?<\/span>/) {
+        $self->bugzilla_version($1);
+    } elsif ($mech->content() =~ /<p class="header_addl_info">version (\d+)\./smi) {
+        $self->bugzilla_version($1);
+    } else {
+        croak("Unable to verify bugzilla version.");
+    }
 }
 
 =item product() version() component() status() assigned_to() resolution() dup_id() assigned_to() summary() bug_number() description() os() platform() severity() priority() cc() url() add_cc() target_milestone() status_whiteboard() keywords() depends_on() blocks() additional_comments()
@@ -423,12 +434,11 @@ closed
 =cut
 
 sub change_status {
-    my $self = shift;
-    my $new_status = shift;
+    my ($self, $status) = @_;
 
     croak("change_status() may not be called until the bug is committed for the first time") if not $self->{bug_number};
 
-    $new_status = uc($new_status);
+    $status = uc($status);
 
     my %status = (  'ASSIGNED'  => 'accept', 
                     'REOPEN'    => 'reopen',
@@ -443,13 +453,12 @@ sub change_status {
                         'REMIND'    => 1,
                         'WORKSFORME' => 1   );
 
-    croak ("$new_status is not a valid status.") if not ($resolution{$new_status} or $status{$new_status});
+    croak ("$status is not a valid status.") if not ($resolution{$status} or $status{$status});
 
-    if ($status{$new_status}) {
-        $self->{status} = $status{$new_status};
+    if ($status{$status}) {
+        $self->{status} = $status{$status};
     } else {
-        $self->{status} = 'resolve';
-        $self->{resolution} = $new_status;
+        $self->{resolution} = $status;
     }
 }
 
@@ -500,6 +509,8 @@ sub add_attachment {
     my $attach_page = $self->{protocol}.'://'.$self->{server}.'/attachment.cgi?bugid='.$self->{bug_number}.'&action=enter';
     
     $mech->get( $attach_page );
+    $self->check_error();
+    $mech->form_name('entryform');
     $mech->field( 'data', $args{'filepath'} );
     $mech->field( 'description', $args{description} );
     $mech->field( 'comment', $args{comment} ) if $args{comment};
@@ -522,9 +533,11 @@ sub add_attachment {
     $mech->submit_form(); 
     $self->check_error();
     my $id;
-    if ($mech->content =~ /Created/) {
+    if ($mech->content =~ /created/i) {
         my $link = $mech->find_link(text_regex => qr/^Attachment #\d+$/);
-        if ($link->attrs()->{'title'} ne "'" . $args{'description'} . "'" ) {
+        my $title = $link->attrs()->{'title'};
+        
+        if ($title ne "'" . $args{'description'} . "'" && $title ne $args{'description'}) {
             croak('attachment not created');
         }
         if ($link->text =~ /^Attachment #(\d+)$/) {
@@ -555,12 +568,16 @@ sub list_attachments {
     $self->check_error();
     
     my (@attachments);
+    my %seen;
     foreach my $link ($mech->find_all_links(url_regex => qr/attachment\.cgi\?id=\d+$/)) {
-        if ($link->url() =~ /attachment.cgi\?id=(\d+)$/) {
+        if ($link->url() =~ /^attachment.cgi\?id=(\d+)$/) {
             my $id = $1;
-            my $re = '<a href="' . $link->url() . '"><span class="(bz_obsolete)">';
-            $re =~ s/\?/\\?/g;
-            my $obsolete = ($mech->content() =~ /$re/) ? 1 : 0;
+            next if ($seen{$id});
+            $seen{$id}++;
+            my $i = $link->url();
+            $i =~ s/\?/\\?/g;
+            my $re = '<a(?: name="a\d+")? href="' . $i . '"(?:\s*title="View the content of the attachment">\s*<b>|>)?<span class="(bz_obsolete)">';
+            my $obsolete = ($mech->content() =~ /$re/smi) ? 1 : 0;
             push (@attachments, { id => $id, name => $link->text(), obsolete => $obsolete });
         } else {
             croak("WWW::Mechanize find_all_links gave us a bogus URL");
@@ -635,6 +652,7 @@ sub obsolete_attachment {
     $links[0]->[0] = $links[0]->[0] . '&action=edit';
     $links[0]->[5]->{'href'} = $links[0]->[5]->{'href'} . '&action=edit';
     $mech->get($links[0]);
+    $mech->form_with_fields('id', 'action', 'contenttypemethod');
     $mech->tick("isobsolete", 1);
     $mech->submit();
     return $mech->content();
@@ -655,21 +673,41 @@ sub commit {
     my $mech = $self->{mech};
 
     if ($self->{bug_number}) {
-        foreach my $field ( keys %update_field_map ) {
-            $mech->field( $update_field_map{$field}, $self->{$field} ) if defined($self->{$field});
-            # handle special cases
+        # bugzilla > 3.0
+        if ($self->bugzilla_version() > 2) {
             if ($self->{resolution}) {
+                $mech->field('knob', 'RESOLVED');
+                $mech->field('resolution_knob_5', $self->{resolution});
+                $self->{resolution} = undef;
+            } elsif ($self->{status}) {
+                my %status_map = ('reopen' => 'none', 'resolve' => 'RESOLVED', 'accept' => 'ASSIGNED'); # , 'none' => 'none', 'duplicate' => 'duplicate');
+                my $val = ($status_map{$self->{status}}) ? $status_map{$self->{status}} : $self->{status};
+                $mech->field('knob', $val);
+                $self->{status} = undef;
+            }
+        } else {
+            if ($self->{resolution}) {
+                $mech->field('knob', 'resolve');
                 $mech->field('resolution', $self->{resolution});
                 $self->{resolution} = undef;
+                $self->{status} = undef;
+            } elsif ($self->{status}) {
+                $mech->field('knob', $self->{status});
+                $self->{status} = undef;
             }
-            if ($self->{dup_id}) {
-                $mech->field('dup_id', $self->{dup_id});
-                $self->{dup_id} = undef;
-            }
-            if ($self->{assigned_to}) {
-                $mech->field('assigned_to', $self->{assigned_to});
-                $self->{assigned_to} = undef;
-            }
+        }
+        
+        if ($self->{dup_id}) {
+            $mech->field('dup_id', $self->{dup_id});
+            $self->{dup_id} = undef;
+        }
+        if ($self->{assigned_to}) {
+            $mech->field('assigned_to', $self->{assigned_to});
+            $self->{assigned_to} = undef;
+        }
+        foreach my $field ( keys %update_field_map ) {
+            next if $mech->current_form->find_input($update_field_map{$field})->type eq 'hidden';
+            $mech->field( $update_field_map{$field}, $self->{$field} ) if defined($self->{$field});
         }
     } else {
         foreach my $field ( keys %new_field_map ) {
@@ -684,8 +722,15 @@ sub commit {
 
     $mech->submit_form();
     $self->check_error();
-    $self->{bug_number} = $mech->current_form->value( 'id' ) if not ($self->{bug_number});
-
+    if (!$self->{bug_number}) {
+        if ($mech->content() =~ /<h2>Bug (\d+) has been added to the database/) {
+            $self->{bug_number} = $1;
+        } elsif ($mech->content() =~ />Bug (\d+)<\/a><\/i> has been added to the database<\/dt>/) {
+            $self->{bug_number} = $1;
+        } else {
+            croak("bug was not saved");
+        }
+    }
     $self->_get_update_page() unless ($args{finished});
 
     return $self->{bug_number};
@@ -717,6 +762,10 @@ sub get_products {
     my $mech = $self->{mech};
     
     my $url = $self->{protocol}.'://'.$self->{server}.'/enter_bug.cgi';
+    # version >= 3.0
+    if ($self->bugzilla_version == 3) {
+        $url .= '?classification=__all';
+    }
     $mech->get($url);
     $self->check_error();
 
