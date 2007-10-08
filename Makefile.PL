@@ -8,8 +8,9 @@ WriteMakefile(
     'VERSION_FROM' => 'WWW/Bugzilla.pm',     # finds $VERSION
     'PREREQ_PM'    => {
         Carp               => 0,
-        WWW::Mechanize     => 1.22,
+        WWW::Mechanize     => 1.30, # this is what I'm testing with... it has been known to work with 1.22, but its what I have...
         Class::MethodMaker => 1.08,
         Params::Validate   => 0.88,
+        Crypt::SSLeay      => 0.57,
     },
 );

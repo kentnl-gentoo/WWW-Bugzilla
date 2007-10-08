@@ -1,6 +1,6 @@
 package WWW::Bugzilla;
 
-$WWW::Bugzilla::VERSION = '1.2';
+$WWW::Bugzilla::VERSION = '1.3';
 
 use strict;
 use warnings;
@@ -727,7 +727,10 @@ sub commit {
             $self->{bug_number} = $1;
         } elsif ($mech->content() =~ />Bug (\d+)<\/a><\/i> has been added to the database<\/dt>/) {
             $self->{bug_number} = $1;
+        } elsif ($mech->content() =~ /Bug (\d+) Submitted</) {
+            $self->{bug_number} = $1;
         } else {
+            # warn $mech->content();
             croak("bug was not saved");
         }
     }

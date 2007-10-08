@@ -10,7 +10,7 @@ BEGIN { use_ok('WWW::Bugzilla'); }
 my $bug_number = 5731;
 
 verify_host();
-plan tests => 71;
+plan tests => 70;
 
 #my $server   = 'landfill.bugzilla.org/bugzilla-tip';
 my $server   = 'landfill.bugzilla.org/bugzilla-stable';

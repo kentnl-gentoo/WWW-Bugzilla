@@ -9,7 +9,7 @@ use Data::Dumper;
 BEGIN { use_ok('WWW::Bugzilla::Search'); }
 
 verify_host();
-plan tests => 22;
+plan tests => 21;
 
 #my $server   = 'landfill.bugzilla.org/bugzilla-tip';
 my $server   = 'landfill.bugzilla.org/bugzilla-stable';
