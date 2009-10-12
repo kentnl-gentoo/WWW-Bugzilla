@@ -1,6 +1,6 @@
 package WWW::Bugzilla::Search;
 
-$WWW::Bugzilla::Search::VERSION = '0.1';
+$WWW::Bugzilla::Search::VERSION = '0.2';
 
 use strict;
 use warnings;
@@ -158,12 +158,14 @@ sub _field_values {
     if ($mech->{'uri'} ne $url) {
         $mech->get( $url); 
     }
+    $mech->form_name('queryform');
+
     my @values;
-    foreach my $form ($mech->current_form()) {
-        foreach my $field ($form->inputs()) {
-            if ($field->name && $field->name eq $name) {
-                push (@values, grep { defined $_ }$field->possible_values());
-            }
+
+    my $form = $mech->current_form();
+    foreach my $field ($form->inputs()) {
+        if ($field->name && $field->name eq $name) {
+            push (@values, grep { defined $_ }$field->possible_values());
         }
     }
     if (@values) {

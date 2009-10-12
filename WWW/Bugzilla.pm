@@ -1,13 +1,14 @@
 package WWW::Bugzilla;
 
-$WWW::Bugzilla::VERSION = '1.3';
+$WWW::Bugzilla::VERSION = '1.5';
 
 use strict;
 use warnings;
 use WWW::Mechanize;
+use Fatal qw(:void open opendir);
 use Carp qw(croak carp);
 
-use constant FIELDS => qw( bugzilla_version version component status resolution dup_id assigned_to summary bug_number description os platform severity priority cc url add_cc target_milestone status_whiteboard keywords depends_on blocks additional_comments );
+use constant FIELDS => qw( bugzilla_version bugzilla_version_minor version component status resolution dup_id assigned_to summary bug_number description os platform severity priority cc url add_cc target_milestone status_whiteboard keywords depends_on blocks additional_comments );
  
 my %new_field_map = (   product => 'product',
                         version => 'version',
@@ -21,6 +22,10 @@ my %new_field_map = (   product => 'product',
                         priority => 'priority',
                         cc => 'cc',
                         url => 'bug_file_loc' );
+
+my %other_field_map = (
+    resolution => 'resolution_knob_5',
+    );
 
 my %update_field_map = (product => 'product',
 #                        bug_number => 'id', 	# this cannot be updated
@@ -223,6 +228,7 @@ sub init {
         $self->_get_new_page();
     }
 
+    $self->check_error();
     return $self;
 }
 
@@ -243,19 +249,18 @@ sub _get_update_page {
     my $self = shift;
 
     my $mech = $self->{mech};
-
-    my $update_page = $self->{protocol}.'://'.$self->{server}.'/show_bug.cgi?id='.$self->{bug_number};
-    $mech->get($update_page);
+    $self->_get_form_by_field('quicksearch');
+    $mech->field('quicksearch', $self->{bug_number});
+    $mech->submit();
     $self->check_error();
-    $mech->form_name('changeform');
-
-    # bail unless OK or Redirect happens
-    croak("Cannot open page $update_page") unless ( ($mech->status == '200') or ($mech->status == '404') );
-
+    
+    $mech->form_name("changeform");
     # set fields to chosen values
     foreach my $field ( keys %update_field_map ) {
         if ($mech->current_form->find_input($update_field_map{$field})) {    
             $self->{$field} = $mech->current_form->value( $update_field_map{$field} );
+        } else {
+#            warn "# Couldn't find $field";
         }
     }
 }
@@ -294,15 +299,22 @@ sub _login {
     $mech->field('Bugzilla_login', $email);
     $mech->field('Bugzilla_password', $password);
     $mech->submit_form();
+
     
     $mech->get($self->{protocol}.'://'.$server.'/');
 
-    if ($mech->content() =~ /<span>Version (\d+)\.\d+(\.\d+)?\+?<\/span>/) {
+    if ($mech->content() =~ /<span>Version (\d+)\.(\d+)(\.\d+)?\+?<\/span>/) {
         $self->bugzilla_version($1);
+        $self->bugzilla_version_minor($2);
     } elsif ($mech->content() =~ /<p class="header_addl_info">version (\d+)\./smi) {
         $self->bugzilla_version($1);
     } else {
         croak("Unable to verify bugzilla version.");
+    }
+
+    if ($self->bugzilla_version > 2) {
+        $update_field_map{'status'} = 'bug_status';
+        $other_field_map{'resolution'} = 'resolution';
     }
 }
 
@@ -410,7 +422,8 @@ sub mark_as_duplicate {
     
     croak("mark_as_duplicate() may not be called until the bug is committed for the first time") if not $self->{bug_number};
 
-    $self->{status} = 'duplicate';
+    $self->{status} = 'RESOLVED';
+    $self->{resolution} = 'DUPLICATE';
     $self->{dup_id} = $dup_id;    
 }
 
@@ -440,26 +453,35 @@ sub change_status {
 
     $status = uc($status);
 
-    my %status = (  'ASSIGNED'  => 'accept', 
-                    'REOPEN'    => 'reopen',
-                    'VERIFIED'  => 'verify',
-                    'CLOSED'    => 'close' );
+    my %status = (
+            'ASSIGNED'  => 'accept', 
+            'REOPENED'    => 'reopen',
+            'VERIFIED'  => 'verify',
+            'CLOSED'    => 'close'
+            );
 
-    my %resolution = (  'ASSIGNED'  => 1,
-                        'FIXED'     => 1,
-                        'INVALID'   => 1,
-                        'WONTFIX'   => 1,
-                        'LATER'     => 1,
-                        'REMIND'    => 1,
-                        'WORKSFORME' => 1   );
+    my %resolution = (
+            'FIXED'     => 1,
+            'INVALID'   => 1,
+            'WONTFIX'   => 1,
+            'LATER'     => 1,
+            'REMIND'    => 1,
+            'DUPLICATE' => 1,
+            'WORKSFORME' => 1   
+            );
 
     croak ("$status is not a valid status.") if not ($resolution{$status} or $status{$status});
 
     if ($status{$status}) {
-        $self->{status} = $status{$status};
+        $self->{status} = $status;
+        $self->{resolution} = '';
+        # $status{$status};
     } else {
+        $self->{status} = "RESOLVED";
         $self->{resolution} = $status;
     }
+
+    return 1;
 }
 
 =item add_attachment()
@@ -671,28 +693,33 @@ sub commit {
     my $self = shift;
     my %args = @_;
     my $mech = $self->{mech};
+ 
+#    print $mech->uri() . "\n";
+    if ($mech->content() !~ /a href="index\.cgi\?logout=1">/) {
+        croak("must be logged in to commit bugs");
+    }
 
     if ($self->{bug_number}) {
         # bugzilla > 3.0
         if ($self->bugzilla_version() > 2) {
             if ($self->{resolution}) {
-                $mech->field('knob', 'RESOLVED');
-                $mech->field('resolution_knob_5', $self->{resolution});
+                $mech->field($update_field_map{'status'}, $self->{'status'});
+                $mech->field($other_field_map{'resolution'}, $self->{resolution});
                 $self->{resolution} = undef;
+                $self->{status} = undef;
             } elsif ($self->{status}) {
-                my %status_map = ('reopen' => 'none', 'resolve' => 'RESOLVED', 'accept' => 'ASSIGNED'); # , 'none' => 'none', 'duplicate' => 'duplicate');
-                my $val = ($status_map{$self->{status}}) ? $status_map{$self->{status}} : $self->{status};
-                $mech->field('knob', $val);
+                $mech->field('bug_status', $self->{'status'});
+                $self->{resolution} = undef;
                 $self->{status} = undef;
             }
         } else {
             if ($self->{resolution}) {
-                $mech->field('knob', 'resolve');
-                $mech->field('resolution', $self->{resolution});
+                $mech->field($update_field_map{'status'}, 'resolve');
+                $mech->field($other_field_map{'resolution'}, $self->{resolution});
                 $self->{resolution} = undef;
                 $self->{status} = undef;
             } elsif ($self->{status}) {
-                $mech->field('knob', $self->{status});
+                $mech->field($update_field_map{'status'}, $self->{status});
                 $self->{status} = undef;
             }
         }
@@ -706,6 +733,13 @@ sub commit {
             $self->{assigned_to} = undef;
         }
         foreach my $field ( keys %update_field_map ) {
+            # field is missing
+            if (!$mech->current_form->find_input($update_field_map{$field})) {
+#                warn "# $field is missing";
+                next;
+            }
+            
+            # field is hidden 
             next if $mech->current_form->find_input($update_field_map{$field})->type eq 'hidden';
             $mech->field( $update_field_map{$field}, $self->{$field} ) if defined($self->{$field});
         }
@@ -720,7 +754,18 @@ sub commit {
         }
     }
 
+    # delete the comment such that we don't reuse the same comment again accidentally.
+    delete($self->{'comment'});
+
     $mech->submit_form();
+        
+    # 3.3+ token checking
+    if ($mech->content() =~ /You submitted changes to process_bug\.cgi with an invalid/) {
+        $mech->form_name('check');
+        $mech->submit_form();
+    }
+
+
     $self->check_error();
     if (!$self->{bug_number}) {
         if ($mech->content() =~ /<h2>Bug (\d+) has been added to the database/) {
@@ -729,8 +774,10 @@ sub commit {
             $self->{bug_number} = $1;
         } elsif ($mech->content() =~ /Bug (\d+) Submitted</) {
             $self->{bug_number} = $1;
+        } elsif ($mech->content() =~ /Bug&nbsp;(\d+) Submitted</) {
+            $self->{bug_number} = $1;
         } else {
-            # warn $mech->content();
+#           warn $mech->content();
             croak("bug was not saved");
         }
     }
@@ -750,6 +797,10 @@ sub check_error {
     my $mech = $self->{mech};
     
     if ($mech->content() =~ /<td bgcolor="#ff0000">[\s\r\n]*<font size="\+2">[\s\r\n]*(.*?)[\s\r\n]*<\/font>[\s\r\n]*<\/td>/smi) {
+        croak("error : $1");
+    } elsif ($mech->content() =~ /<td id="error_msg" class="throw_error">\s*(.*?)\s*<\/td>/smi) {
+        croak("error : $1");
+    } elsif ($mech->content() =~ /<div class="throw_error">\s*(.*?)<\/div>/smi) {
         croak("error : $1");
     }
 }
@@ -780,6 +831,7 @@ sub get_products {
     return (@products);
 }
 
+
 =item get_comments()
 
 Lists comments made on an existing bug - will not work for new bugs.
@@ -802,6 +854,14 @@ sub get_comments {
         chomp($comment);
         push (@comments, $comment);
     }
+
+    # 3.3+
+    while ($content =~ m/<pre class="bz_comment_text"  id="comment_text_\d+">\s*(.*?)<\/pre>/smg) {
+        my $comment = $1;
+        chomp($comment);
+        push (@comments, $comment);
+    }
+
     return (@comments);
 }
 
